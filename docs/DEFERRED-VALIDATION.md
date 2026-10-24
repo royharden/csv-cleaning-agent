@@ -102,3 +102,20 @@ M4 static check: `node --no-warnings scripts/check-syntax.mjs src/app/controller
 src/lib/supabase.ts src/App.tsx src/main.tsx tests/ui/App.test.tsx` parsed the three `.ts` files with zero
 syntax failures. The `.tsx` files were explicitly reported inspection-only; import resolution, types,
 component behavior, transaction behavior and every runtime assertion above remain unverified.
+
+## M5 evaluation construction (0658, 2026-10-24)
+
+The scorer, cumulative literal and operational-extension oracle, method registry, dev-selected matched subset, journal-backed evaluator, report writer and generated-limitations writer are source only. Focused scorer/oracle test source exists and has not run. Inherited DEFERRED-VALIDATION.md was backed up to outer `agentops/backups/M5-eval/docs/DEFERRED-VALIDATION.md.bak` before this append. A minimal static LIMITATIONS.md is an M5-to-M7 seam; M7 may finalize its static text while preserving the unique generated marker.
+
+| What | Why deferred | Later check |
+|---|---|---|
+| Types and seams | Only approved erasable-TypeScript syntax parsing and read-only source inspection were performed; this cannot resolve imports, types or behavior. | `npm run typecheck`; focused scorer/oracle tests after dependency installation is separately authorized. |
+| Gold scoring and oracles | Rid/gold lineage, four classes, missing/empty, duplicates, good-row drops, headers, literal versus extended criteria and rejected-predecessor behavior remain unexecuted test source. | Run `tests/scripts/scorer.test.ts` and `tests/scripts/oracle.test.ts`; inspect named LIMITATIONS output against hand cases. |
+| Seeded corpus and matched reruns | No seed writer, MANIFEST, byte hashes, generation, table profile or eval was executed. Auto-generation on absent MANIFEST is source only; existing corrupt/incomplete corpus should fail. | Run seed reproducibility/roundtrip tests; execute eval; confirm every method is freshly invoked on each 200x6 input/profile chosen only from dev labels. |
+| Journal checks inside eval | Invariant, every inverse predecessor hash, full-undo hash and repeat-output checks have not run. | Execute rules evaluation on both populations; require zero unexplained differences and every hash flag true. |
+| Guard and preservation evidence | Reports name mapped guard traps but a missing proposal is not proof of guard coverage. Withhold/reject/format traps require dedicated checks. | Run all eight guard tests, four bad-model-plan tests, outbound/format tests and four rules preservation traps; inspect held-out named trap results. |
+| Fixtures and live provenance | PENDING/missing llm fixtures are explicitly not yet measured. Jev/direct rows remain registered and not yet measured until M6; no paid/live call was attempted. | Rekey intentional fixtures, then M6 wires provider/ledger/threshold/group metrics. Verify synthetic-fixture rows never become measured-live. |
+| Thresholds, claims and costs | No dev tuning/freeze, held-out accuracy, Jev gate, matched direct-baseline superiority, spend or latency is established. Unknown fixture billing/latency stays unknown. | Freeze dev decisions before held-out; run matched comparators on equal input hashes; report measured group precision/alias recall and provider ledger costs rather than infer them. |
+| Report and limitations artifacts | No results files were generated. Generated LIMITATIONS content may change only below its unique marker; static content is kept exactly. | Execute evaluation after authorization; check every wrongly changed coordinate and missed trap name in Markdown/JSONL/LIMITATIONS and preservation of static prefix. |
+
+M5 static check: `node --no-warnings scripts/check-syntax.mjs scripts/eval/scorer.ts scripts/eval/oracle.ts scripts/eval/subset.ts scripts/eval/methods.ts scripts/eval/run.ts scripts/eval/report.ts scripts/eval/limitations.ts tests/scripts/scorer.test.ts tests/scripts/oracle.test.ts` parsed nine TypeScript files with zero syntax failures. Runtime, import/type resolution and all assertions above remain unverified.

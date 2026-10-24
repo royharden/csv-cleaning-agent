@@ -1,0 +1,19 @@
+{
+  "fixture_id": "orders-demo-category-scores-v1",
+  "planner": "jev",
+  "source": "synthetic-fixture",
+  "source_csv": "fixtures/demo/orders-demo.csv",
+  "excluded_column_ids": ["c6"],
+  "profile_hash": "PENDING",
+  "threshold": 0.9,
+  "pairs": [
+    {
+      "column": "c5",
+      "pairs": [
+        { "a": "NYC", "b": "New York", "score": 0.97 },
+        { "a": "New York", "b": "new york", "score": 0.99 },
+        { "a": "NYC", "b": "new york", "score": 0.96 }
+      ]
+    }
+  ]
+}

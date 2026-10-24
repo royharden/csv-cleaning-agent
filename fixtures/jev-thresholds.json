@@ -1,0 +1,9 @@
+{
+  "status": "not yet frozen",
+  "source": "not yet measured",
+  "generator_version": "seededdirty-v1",
+  "dev_seeds": [1, 2, 3, 4],
+  "threshold": null,
+  "freeze_date": null,
+  "note": "Tune on dev only and freeze before held-out evaluation. demo.jev.json has a synthetic fixture-only replay threshold; it is not a live default."
+}
