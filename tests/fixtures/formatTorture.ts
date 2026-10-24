@@ -120,6 +120,27 @@ const blankLine = Uint8Array.of(
 // "a,b"   (header only, no terminator)
 const headerOnly = Uint8Array.of(0x61, 0x2c, 0x62);
 
+// Malformed quoting (M1 review carry-over). The structural scan follows papaparse's quote rule
+// (src/core/csv/parse.ts `walk`), so both agree on record boundaries; each case warns `malformed_quotes`.
+
+// 'a,b\n1,x"y\n'   (quote inside an unquoted field: literal content)
+const quoteInUnquotedField = Uint8Array.of(
+  0x61, 0x2c, 0x62, 0x0a,
+  0x31, 0x2c, 0x78, 0x22, 0x79, 0x0a,
+);
+
+// 'a,b\n"x"y",z\n'   (text after a quote inside a quoted field: that quote is literal; the field closes at '",')
+const textAfterInnerQuote = Uint8Array.of(
+  0x61, 0x2c, 0x62, 0x0a,
+  0x22, 0x78, 0x22, 0x79, 0x22, 0x2c, 0x7a, 0x0a,
+);
+
+// 'a,b\n1,"x\n2,y\n'   (unclosed quote: the rest of the file is one field; no trailing terminator outside quotes)
+const unclosedQuote = Uint8Array.of(
+  0x61, 0x2c, 0x62, 0x0a,
+  0x31, 0x2c, 0x22, 0x78, 0x0a, 0x32, 0x2c, 0x79, 0x0a,
+);
+
 /** UTF-16LE BOM + "a": rejected as unsupported_encoding. */
 export const UTF16LE_BOM_BYTES = Uint8Array.of(0xff, 0xfe, 0x61, 0x00);
 
@@ -269,6 +290,36 @@ export const TORTURE_FIXTURES: readonly TortureFixture[] = [
       trailingTerminator: false, otherTerminatorRecords: 0,
       header: ['a', 'b'], columnNames: ['a', 'b'], rows: [],
       raggedCount: 0, raggedFirst: [], warningCodes: NONE, reserializesExactly: true,
+    },
+  },
+  {
+    name: 'malformed: quote inside an unquoted field',
+    bytes: quoteInUnquotedField,
+    expect: {
+      encoding: 'utf-8', bom: false, delimiter: ',', delimiterSource: 'detected', terminator: '\n',
+      trailingTerminator: true, otherTerminatorRecords: 0,
+      header: ['a', 'b'], columnNames: ['a', 'b'], rows: [['1', 'x"y']],
+      raggedCount: 0, raggedFirst: [], warningCodes: ['malformed_quotes'], reserializesExactly: false,
+    },
+  },
+  {
+    name: 'malformed: text after a quote inside a quoted field',
+    bytes: textAfterInnerQuote,
+    expect: {
+      encoding: 'utf-8', bom: false, delimiter: ',', delimiterSource: 'detected', terminator: '\n',
+      trailingTerminator: true, otherTerminatorRecords: 0,
+      header: ['a', 'b'], columnNames: ['a', 'b'], rows: [['x"y', 'z']],
+      raggedCount: 0, raggedFirst: [], warningCodes: ['malformed_quotes'], reserializesExactly: false,
+    },
+  },
+  {
+    name: 'malformed: unclosed quote',
+    bytes: unclosedQuote,
+    expect: {
+      encoding: 'utf-8', bom: false, delimiter: ',', delimiterSource: 'detected', terminator: '\n',
+      trailingTerminator: false, otherTerminatorRecords: 0,
+      header: ['a', 'b'], columnNames: ['a', 'b'], rows: [['1', 'x\n2,y\n']],
+      raggedCount: 0, raggedFirst: [], warningCodes: ['malformed_quotes'], reserializesExactly: false,
     },
   },
 ];

@@ -106,9 +106,17 @@ interface WalkResult {
 }
 
 /**
- * Quote-aware structural walk. RFC 4180 rules: a quote opens a quoted field only at field start; inside quotes
- * `""` is an escaped quote and a single `"` closes; delimiters and line breaks inside quotes are content.
- * A quote elsewhere is literal (counted as malformed, matching papaparse's lenient treatment).
+ * Quote-aware structural walk, aligned with papaparse's quote rule so the scanner and the parser agree on record
+ * boundaries for malformed input too:
+ *  - a quote opens a quoted field only at field start; a quote anywhere else in an unquoted field is literal
+ *    content (counted as malformed; papaparse keeps it silently);
+ *  - inside quotes, `""` is an escaped quote (RFC 4180);
+ *  - inside quotes, a single `"` CLOSES the field only when it is followed by the delimiter, CR, LF or the end of
+ *    the scanned text; otherwise it is a literal quote inside the field (counted as malformed; papaparse reports
+ *    InvalidQuotes and keeps searching), and the field stays open;
+ *  - delimiters and line breaks inside quotes are content; an unclosed quote runs to the end (counted).
+ * Known difference: papaparse also accepts spaces between a closing quote and the delimiter/newline (`"x" ,y`);
+ * this walk does not, so such a file reports record_count_mismatch (docs/DEFERRED-VALIDATION.md).
  */
 function walk(text: string, delimiter: Delimiter, maxChars: number, maxRecords: number): WalkResult {
   const delim = delimiter.charCodeAt(0);
@@ -132,12 +140,13 @@ function walk(text: string, delimiter: Delimiter, maxChars: number, maxRecords: 
           i += 2;
           continue;
         }
-        inQuotes = false;
-        i += 1;
-        if (i < end) {
-          const next = text.charCodeAt(i);
-          if (next !== delim && next !== CR && next !== LF) malformedQuotes += 1;
+        const next = i + 1 < end ? text.charCodeAt(i + 1) : -1;
+        if (next === -1 || next === delim || next === CR || next === LF) {
+          inQuotes = false;
+        } else {
+          malformedQuotes += 1;
         }
+        i += 1;
         continue;
       }
       i += 1;
