@@ -63,3 +63,20 @@ type/import resolution and every runtime assertion above remain deferred.
 | Parser/export blob | Original-blob download byte-equality untested. | Browser test: download original equals dropped bytes. |
 | Bolt import | Root build assumed. | Import inner repo; `npm ci && npm run build`; inspect-only handoff first. |
 | Raha script | Not run. | Optional manual run to gitignored `data/external/`. |
+
+## M3 construction (0601 / 0603, 2026-10-24)
+
+The journal, review/approval lifecycle, rejection rulings, plan import/export, rules and fixture planners,
+verify CLI and fixture re-key CLI are source only. Their focused tests are written and have not run.
+Only the approved erasable-TypeScript syntax parser and read-only source inspection were used.
+The inherited copy of this document was backed up to outer `agentops/backups/M3/docs/DEFERRED-VALIDATION.md.bak` before editing.
+
+| What | Why deferred | Later check |
+|---|---|---|
+| Journal replay, undo and invariant | Exact delta/op replay, LIFO inverse hashes, dropped-row lineage and random ragged-table properties are unexecuted test source. | `npx vitest run tests/core/journal.test.ts`; typecheck, then verify a saved real journal with input/output CSV. |
+| Verify tamper classes | Canonical event/params digest checks, strict nested schemas, parse metadata, deletion/reorder, cell/header/drop deltas, undo tip and output rid alignment are source-inspected only. | Run journal tests, then `npm run verify -- journal.jsonl input.csv output.csv`; tamper each artifact independently. This checks consistency, not authenticity. |
+| Review and human edit provenance | In-order decisions, actual approved-only validation, stale suffix approvals, guard reconfirmation and human-introduced category targets need runtime confirmation. | `npx vitest run tests/core/review.test.ts`; M4 browser journey with trim rejected after parse approval. |
+| Rulings and plan import | Profile-bound rejection reasons, duplicate-header count/ordinal resolution and approvals never transferring are source only. | `npx vitest run tests/core/rulings.test.ts tests/core/planio.test.ts`; import a plan onto a different file in M4. |
+| Rules and fixtures | High-cardinality rules require the table-bound planner; the profile-only adapter conservatively skips incomplete evidence. Rules/fixture test source is unexecuted. | `npx vitest run tests/core/rules.test.ts`; rules trap checks plus held-out evaluation after M5 generation. |
+| Fixture re-keying | CLI is written, not run; dependencies and the M4 demo source CSV are still pending. Current fixtures are not invented or silently used as a fallback. | `npm run fixtures:rekey`; confirm source_csv/exclusions match the browser outbound-profile hash and that PENDING, duplicate keys and misses give actionable errors. |
+| Browser/Node crypto and schemas | WebCrypto equivalence, zod record checks, full import/type resolution and performance have not been executed. | `npm run typecheck`, focused tests in Node, browser journal round trip at caps; retain all syntax-check limitations above. |
