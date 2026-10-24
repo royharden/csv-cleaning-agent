@@ -80,3 +80,25 @@ The inherited copy of this document was backed up to outer `agentops/backups/M3/
 | Rules and fixtures | High-cardinality rules require the table-bound planner; the profile-only adapter conservatively skips incomplete evidence. Rules/fixture test source is unexecuted. | `npx vitest run tests/core/rules.test.ts`; rules trap checks plus held-out evaluation after M5 generation. |
 | Fixture re-keying | CLI is written, not run; dependencies and the M4 demo source CSV are still pending. Current fixtures are not invented or silently used as a fallback. | `npm run fixtures:rekey`; confirm source_csv/exclusions match the browser outbound-profile hash and that PENDING, duplicate keys and misses give actionable errors. |
 | Browser/Node crypto and schemas | WebCrypto equivalence, zod record checks, full import/type resolution and performance have not been executed. | `npm run typecheck`, focused tests in Node, browser journal round trip at caps; retain all syntax-check limitations above. |
+
+## M4 browser construction (0640 / 0642, 2026-10-24)
+
+Browser source wires the existing M3 review/journal engines, local IndexedDB snapshots and the hand-authored
+`fixtures/demo/orders-demo.csv`. The original bytes are kept as a Blob; sample loading is `?url` → `fetch` →
+`ArrayBuffer`, never a text conversion. Inherited App/main/deferred-doc files were backed up under outer
+`agentops/backups/M4/` before replacement. No dependency install, browser, database, fetch, app, build or test
+was executed. The code paths below remain construction-only, runtime unverified.
+
+| What | Why deferred | Later check |
+|---|---|---|
+| React journey and keyboard review | TSX receives source inspection only; focused StepCard/PlanReview/Apply-gate test source is unexecuted. | `npm run typecheck`; `npx vitest run tests/ui`; browser walkthrough with `j/k/a/r/e/c`, reason entry, explicit guard confirmation and validation acknowledgement. |
+| IndexedDB atomicity and cross-tab concurrency | Head + 64 Ki-character journal chunks + old-generation removal share one transaction; rejected writes are intended to leave the prior head. The controller serializes intents and publishes only after save. Generation comparison refuses another tab's replacement. These paths are source-inspected only. | Browser: force quota/write failure during broad trim, confirm displayed/saved old state; reload; race two tabs and require stale writer to reload; verify no partial chunks or head become visible. |
+| Persisted review and journal | Reload reconstructs review with M3 refresh and folds the full journal; apply/undo/reapply keep prior events. Hashes bind the review to its predecessor; this has not run. | Approve → Apply → undo-to-N → undo-all → reload → reapply, compare first/reapplied output hashes and verify exported journal includes all undo/reapply events. |
+| Demo source and fixture seam | Forty hand-authored rows include non-snake headers, padded amounts and duplicates, aliases/case variants, NA, ambiguous dates, a formula and two instruction-like notes. CSV parsing is unexecuted; fixtures intentionally remain unavailable until keyed. | Confirm seven columns/40 rows/zero ragged records; exclude c6 notes; run `npm run fixtures:rekey` after M5 fixtures exist; reload and compare browser outbound hash. Pending fixtures must remain actionable errors. |
+| Import/export artifacts | Original byte download, UTF-8 serialization, formula warning, approved-only plan manifest, imported rejection notes and rulings replay are source only. | Download original and compare bytes; verify cleaned CSV/journal; import plan on a second file and require fresh approvals; import rulings and confirm retained rejection reason. |
+| Supabase and live setup | Nullable client construction is source only. Mock rules works without configuration; live controls are disabled for M4, with actual live gate/session activation owned by M6. | Check missing/invalid public configuration renders Mock mode; M6 wires authenticated live planners and owner cap attestation before activation. |
+
+M4 static check: `node --no-warnings scripts/check-syntax.mjs src/app/controller.ts src/store/idb.ts
+src/lib/supabase.ts src/App.tsx src/main.tsx tests/ui/App.test.tsx` parsed the three `.ts` files with zero
+syntax failures. The `.tsx` files were explicitly reported inspection-only; import resolution, types,
+component behavior, transaction behavior and every runtime assertion above remain unverified.
