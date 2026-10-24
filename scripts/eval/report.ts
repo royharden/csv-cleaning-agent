@@ -26,6 +26,25 @@ function comparison(rows: readonly EvalRow[], method: 'rules' | 'llm', mode: Eva
   }
   return tested === 0 ? 'not yet measured' : `held on ${tested} matched held-out files (see provenance; this is no live-provider claim)`;
 }
+function jevGate(rows: readonly EvalRow[]): string {
+  const population = rows.filter((r) => r.population === 'full' && r.split === 'heldout' && r.mode === 'unreviewed');
+  const jev = population.filter((r) => r.method === 'jev-on-rules');
+  if (jev.length === 0 || jev.some((r) => r.status !== 'measured' || r.metadata?.provenance !== 'measured-live')) return 'not yet measured (complete live held-out Jev/LLM and rules comparisons required).';
+  for (const method of ['rules', 'llm'] as const) {
+    let jw = 0; let bw = 0; let jf = 0; let bf = 0; let errors = 0;
+    for (const row of jev) {
+      const baseline = population.find((r) => r.method === method && r.dataset === row.dataset);
+      if (baseline?.status !== 'measured' || baseline.input.hash !== row.input.hash || row.measurement === undefined || baseline.measurement === undefined ||
+        (method === 'llm' && baseline.metadata?.provenance !== 'measured-live')) return 'not yet measured (missing matched live/baseline evidence).';
+      jw += row.measurement.category_groups.wrongly_merged; bw += baseline.measurement.category_groups.wrongly_merged;
+      jf += row.measurement.score.categories.alias?.fixed ?? 0; bf += baseline.measurement.score.categories.alias?.fixed ?? 0;
+      errors += row.measurement.score.categories.alias?.errors ?? 0;
+    }
+    if (errors === 0) return 'not yet measured (no held-out alias denominator).';
+    if (jw >= bw || jf < bf) return `not held against ${method}; Jev remains experimental.`;
+  }
+  return 'held for this measured full-vocabulary held-out population; default selection still requires an explicit owner decision.';
+}
 export function renderReport(rows: readonly EvalRow[], runDate: string): string {
   const out = [ '# Evaluation results', '', `Run date: ${escape(runDate)}. Data: seeded synthetic fixtures, never customer data.`,
     'Generator version, byte hashes, row lineage, split seeds and owner freeze date are in `fixtures/seeded/MANIFEST.json`; each JSONL row pins its input table hash.',
@@ -66,6 +85,14 @@ export function renderReport(rows: readonly EvalRow[], runDate: string): string 
       out.push(`| ${row.method} / ${row.dataset} / ${row.population} / ${row.mode} | ${op} | ${stratum.fixed}/${stratum.errors} | ${percent(stratum.recall)} |`);
     }
   }
+  out.push('', 'Category groups and disclosure diagnostics (eligible recall never replaces full-vocabulary alias recall):', '',
+    '| Method / dataset / population / mode | Applied groups | Wrongly merged | Group precision | Eligible alias fixed/errors (recall) | Transitive bridges |',
+    '|---|---:|---:|---|---|---:|');
+  for (const row of ordered(rows)) {
+    const groups = row.measurement?.category_groups; if (groups === undefined) continue;
+    const eligible = row.measurement?.eligible_alias;
+    out.push(`| ${row.method} / ${row.dataset} / ${row.population} / ${row.mode} | ${groups.applied} | ${groups.wrongly_merged} | ${percent(groups.precision)} | ${eligible === undefined ? 'not applicable' : `${eligible.fixed}/${eligible.errors} (${percent(eligible.recall)})`} | ${row.metadata?.transitive_bridges?.length ?? 'not applicable'} |`);
+  }
   out.push('', 'Deterministic checks and named trap evidence:', '',
     '| Method / dataset / population / mode | Unexplained | Every inverse hash | Full undo hash | Repeat hash | Guard-related trap names | Missed trap names |', '|---|---|---|---|---|---|---|');
   for (const row of ordered(rows)) {
@@ -76,7 +103,7 @@ export function renderReport(rows: readonly EvalRow[], runDate: string): string 
     'All-guard coverage, adversarial-item rejection and the four rules preservation traps require their focused tests plus held-out execution; no aggregate pass is inferred from a missing proposal.',
     '', 'Matched held-out proposal (strictly fewer wrongly changed cells per file than llm_direct):', '');
   for (const method of ['rules', 'llm'] as const) for (const mode of ['unreviewed', 'oracle', 'oracle+ops'] as const) out.push(`- ${method}, ${mode}: ${comparison(rows, method, mode)}.`);
-  out.push('', 'Jev default-on gate: not yet measured. It requires fewer wrongly merged groups than both rules and llm at equal or better full-vocabulary alias recall on held-out. Cell scores alone do not establish group precision.',
+  out.push('', `Jev default-on gate: ${jevGate(rows)} It requires fewer wrongly merged groups than both rules and llm at equal or better full-vocabulary alias recall on held-out.`,
     '', 'Unavailable or failed rows:', '');
   for (const row of ordered(rows)) if (row.status !== 'measured') out.push(`- ${row.method} / ${row.dataset} / ${row.population} / ${row.mode}: ${row.status}: ${escape(row.reason ?? 'no measurement')}`);
   out.push('', 'Unknown billing, usage or latency is unknown rather than zero. Rules has zero provider spend. Fixture replay has no measured model billing/latency. Full per-row provenance, coordinates, decisions and rates are in results.jsonl.', '');

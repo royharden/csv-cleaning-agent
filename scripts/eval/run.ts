@@ -26,6 +26,7 @@ import { rate, scoreDataset, type Score } from './scorer.ts';
 import { matchedSubset, selectSubsetColumns, type SubsetSelection } from './subset.ts';
 import { renderReport } from './report.ts';
 import { updateLimitations } from './limitations.ts';
+import { createLiveRuntime, type LiveRuntime } from './ledger.ts';
 export type Population = 'full' | 'matched-200x6';
 export interface StepDecision {
   readonly step_id: string; readonly status: 'applied' | 'rejected' | 'guard-blocked' | 'oracle-rejected';
@@ -38,6 +39,9 @@ export interface PlanMeasurement {
     readonly ambiguity_decisions: number; readonly step_precision: number | null };
   readonly guards: { readonly blocks: number; readonly ids: readonly string[]; readonly trap_names: readonly string[] };
   readonly deterministic: { readonly unexplained: number; readonly undo_every_step: boolean; readonly undo_input_hash_equal: boolean; readonly repeat_hash_equal: boolean };
+  readonly category_groups: { readonly applied: number; readonly wrongly_merged: number; readonly precision: number | null;
+    readonly wrong: readonly { readonly step_id: string; readonly column: string; readonly members: readonly string[]; readonly gold_values: readonly string[] }[] };
+  readonly eligible_alias?: { readonly fixed: number; readonly errors: number; readonly recall: number | null };
 }
 export interface EvalRow {
   readonly dataset: string; readonly family: string; readonly split: string; readonly seed: number;
@@ -63,6 +67,8 @@ function rawId(value: unknown, index: number): string {
 /** Revalidation, guards, preview and approvals are all based on the actually kept predecessor. */
 export async function runPlan(data: SeededDataset, rawSteps: readonly unknown[], mode: ReviewMode): Promise<PlanMeasurement> {
   let current = data.dirty; let unparsed = 0;
+  let categoryGroups = 0;
+  const wrongGroups: PlanMeasurement['category_groups']['wrong'][number][] = [];
   const decisions: StepDecision[] = []; const approvals: Approval[] = []; const steps: PlanStep[] = [];
   const duplicateIds = new Set(rawSteps.map(rawId).filter((id, index, ids) => ids.indexOf(id) !== index));
   // Obtain plan context without trusting any raw payload as a typed operation. Revalidated at its real turn below.
@@ -99,6 +105,24 @@ export async function runPlan(data: SeededDataset, rawSteps: readonly unknown[],
       if (!choice.keep) { decisions.push({ step_id: id, status: 'oracle-rejected', reasons: [choice.reason], guards, traps, samples_shown: samples, beneficial: false }); continue; }
     }
     approvals.push(await createApproval(current, step, guards, guards.map((guard) => guard.guard), EVAL_TIME));
+    if (step.op === 'map_categories') {
+      const column = step.columns[0]; const ci = current.cols.findIndex((c) => c.id === column);
+      const goldColumn = data.clean.cols.findIndex((c) => c.id === column);
+      const groups = (step.params as { groups: readonly { from: readonly string[]; to: string }[] }).groups;
+      for (const group of groups) {
+        const members = [...new Set([...group.from, group.to])];
+        if (!current.rows.some((row) => group.from.includes(row[ci]) && row[ci] !== group.to)) continue;
+        categoryGroups += 1; const gold = new Set<string>();
+        current.rows.forEach((row, index) => {
+          if (!members.includes(row[ci])) return;
+          const cleanRid = data.row_map.find((entry) => entry.rid === current.rid[index])?.clean_rid;
+          const cleanRow = data.clean.rid.findIndex((rid) => rid === cleanRid);
+          const value = data.clean.rows[cleanRow]?.[goldColumn];
+          if (value !== undefined) gold.add(value);
+        });
+        if (gold.size > 1) wrongGroups.push({ step_id: step.id, column, members, gold_values: [...gold].sort() });
+      }
+    }
     steps.push(step); current = preview.result.table; unparsed += preview.counts.unparsed;
     decisions.push({ step_id: id, status: 'applied', reasons: [], guards, traps, samples_shown: samples, beneficial });
   }
@@ -118,6 +142,7 @@ export async function runPlan(data: SeededDataset, rawSteps: readonly unknown[],
   const kept = decisions.filter((decision) => decision.status === 'applied');
   const blocks = decisions.filter((decision) => decision.status === 'guard-blocked');
   return { output: executed.table, score: scoreDataset(data, executed.table, unparsed), decisions,
+    category_groups: { applied: categoryGroups, wrongly_merged: wrongGroups.length, precision: rate(categoryGroups - wrongGroups.length, categoryGroups), wrong: wrongGroups },
     burden: { proposed_steps: rawSteps.length, applied_steps: kept.length, samples_shown: decisions.reduce((n, step) => n + step.samples_shown, 0),
       ambiguity_decisions: decisions.filter((decision) => decision.guards.length > 0).length,
       step_precision: rate(kept.filter((step) => step.beneficial).length, kept.length) },
@@ -126,7 +151,7 @@ export async function runPlan(data: SeededDataset, rawSteps: readonly unknown[],
     deterministic: { unexplained, undo_every_step: true, undo_input_hash_equal: await hashTable(undone.table) === await hashTable(data.dirty),
       repeat_hash_equal: await hashTable(repeated.table) === await hashTable(executed.table) } };
 }
-export async function evaluateMethod(data: SeededDataset, method: EvalMethod, population: Population, fixtures: readonly unknown[], selection?: SubsetSelection): Promise<EvalRow[]> {
+export async function evaluateMethod(data: SeededDataset, method: EvalMethod, population: Population, fixtures: readonly unknown[], selection?: SubsetSelection, live?: LiveRuntime): Promise<EvalRow[]> {
   const cells = data.dirty.rows.reduce((n, row) => n + row.length, 0);
   const base = { dataset: data.id, family: data.family, split: data.split, seed: data.seed, population, method: method.id,
     data_source: 'seeded-synthetic' as const, generator_version: GENERATOR_VERSION,
@@ -136,19 +161,31 @@ export async function evaluateMethod(data: SeededDataset, method: EvalMethod, po
   try {
     const local = buildLocalProfile(data.dirty); const outbound = buildOutboundProfile(data.dirty, local, { excludedColumnIds: [] });
     if (!outbound.fits) throw new Error('Outbound profile exceeds bounded envelope');
-    const result = await method.propose({ data, local, outbound: outbound.profile, fixtures });
+    const result = await method.propose({ data, local, outbound: outbound.profile, fixtures, ...(live === undefined ? {} : { live }) });
     if (result.status === 'not yet measured') return modes.map((mode) => ({ ...base, mode, status: 'not yet measured', reason: result.reason, cost_per_1000_cells: null }));
     const { status: _status, kind: _kind, ...rest } = result;
     const metadata: MeasurementMeta = { provenance: rest.provenance, cost_usd: rest.cost_usd, latency_ms: rest.latency_ms,
       ...(rest.fixture_id === undefined ? {} : { fixture_id: rest.fixture_id }), ...(rest.model === undefined ? {} : { model: rest.model }),
       ...(rest.provider === undefined ? {} : { provider: rest.provider }), ...(rest.usage === undefined ? {} : { usage: rest.usage }),
       ...(rest.candidate_coverage === undefined ? {} : { candidate_coverage: rest.candidate_coverage }) };
-    if (result.kind === 'direct') return [{ ...base, mode: 'not applicable', status: 'measured', metadata,
+    const enrichedMetadata: MeasurementMeta = { ...metadata,
+      ...(rest.category_candidates === undefined ? {} : { category_candidates: rest.category_candidates }),
+      ...(rest.transitive_bridges === undefined ? {} : { transitive_bridges: rest.transitive_bridges }) };
+    if (result.kind === 'direct') return [{ ...base, mode: 'not applicable', status: 'measured', metadata: enrichedMetadata,
       direct_score: scoreDataset(data, result.output), cost_per_1000_cells: metadata.cost_usd === null || cells === 0 ? null : metadata.cost_usd * 1000 / cells }];
     const rows: EvalRow[] = [];
     for (const mode of ['unreviewed', 'oracle', 'oracle+ops'] as const) {
       const { output: _output, ...measurement } = await runPlan(data, result.steps, mode);
-      rows.push({ ...base, mode, status: 'measured', metadata, measurement,
+      const aliases = data.labels.cells.filter((label) => {
+        const candidates = enrichedMetadata.category_candidates?.[label.column];
+        return label.variant === 'alias' && candidates !== undefined && candidates.includes(label.dirty) && candidates.includes(label.clean);
+      });
+      const fixed = aliases.filter((label) => {
+        const row = _output.rid.indexOf(label.rid); const column = _output.cols.findIndex((c) => c.id === label.column);
+        return row >= 0 && _output.rows[row][column] === label.clean;
+      }).length;
+      rows.push({ ...base, mode, status: 'measured', metadata: enrichedMetadata,
+        measurement: { ...measurement, ...(enrichedMetadata.category_candidates === undefined ? {} : { eligible_alias: { fixed, errors: aliases.length, recall: rate(fixed, aliases.length) } }) },
         cost_per_1000_cells: metadata.cost_usd === null || cells === 0 ? null : metadata.cost_usd * 1000 / cells });
     }
     return rows;
@@ -161,7 +198,9 @@ async function fixtureRecords(root: string): Promise<unknown[]> {
   try { files = await readdir(root); } catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []; throw error; }
   return Promise.all(files.filter((file) => file.endsWith('.json')).sort().map(async (file) => JSON.parse(await readFile(join(root, file), 'utf8')) as unknown));
 }
-export async function runEvaluation(root: string): Promise<readonly EvalRow[]> {
+export async function runEvaluation(root: string, options: { readonly live?: boolean } = {}): Promise<readonly EvalRow[]> {
+  const results = join(root, 'results'); await mkdir(results, { recursive: true });
+  const live = options.live === true ? await createLiveRuntime(root, join(results, `callledger-${Date.now()}.jsonl`)) : undefined;
   const seeded = join(root, 'fixtures', 'seeded');
   try { await access(join(seeded, 'MANIFEST.json')); }
   catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; await writeSeededFixtures(seeded); }
@@ -172,10 +211,9 @@ export async function runEvaluation(root: string): Promise<readonly EvalRow[]> {
     const selection = selectSubsetColumns(datasets.filter((dataset) => dataset.split === 'dev'), data.family);
     // Every method is called again on the projected input/profile; full-file plans are never cropped.
     for (const [population, input] of [['full', data], ['matched-200x6', matchedSubset(data, selection)]] as const) {
-      for (const method of METHODS) rows.push(...await evaluateMethod(input, method, population, fixtures, population === 'matched-200x6' ? selection : undefined));
+      for (const method of METHODS) rows.push(...await evaluateMethod(input, method, population, fixtures, population === 'matched-200x6' ? selection : undefined, live));
     }
   }
-  const results = join(root, 'results'); await mkdir(results, { recursive: true });
   await writeFile(join(results, 'results.jsonl'), rows.map((row) => JSON.stringify(row)).join('\n') + '\n');
   await writeFile(join(results, 'results.md'), renderReport(rows, new Date().toISOString()));
   await updateLimitations(join(root, 'docs', 'LIMITATIONS.md'), rows);
@@ -183,10 +221,11 @@ export async function runEvaluation(root: string): Promise<readonly EvalRow[]> {
 }
 const invoked = process.argv[1];
 if (invoked !== undefined && pathToFileURL(resolve(invoked)).href === import.meta.url) {
-  if (process.argv.slice(2).length > 0) {
-    console.error('M5 eval accepts no live flags. Live provider and budget activation are deferred to M6.'); process.exitCode = 1;
+  const flags = process.argv.slice(2);
+  if (flags.some((flag) => flag !== '--live') || flags.length > 1) {
+    console.error('Usage: npm run eval -- [--live]'); process.exitCode = 1;
   } else {
     const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-    runEvaluation(root).catch((error: unknown) => { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; });
+    runEvaluation(root, { live: flags.includes('--live') }).catch((error: unknown) => { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; });
   }
 }

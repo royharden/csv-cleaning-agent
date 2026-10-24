@@ -1,0 +1,11 @@
+# Auth: anonymous user sign-in is required; a project anon key alone is insufficient.
+[auth]
+enable_anonymous_sign_ins = true
+
+[functions.propose-plan]
+verify_jwt = true
+import_map = "./functions/propose-plan/deno.json"
+
+[functions.judge-categories]
+verify_jwt = true
+import_map = "./functions/judge-categories/deno.json"

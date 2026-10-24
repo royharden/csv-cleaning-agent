@@ -18,6 +18,14 @@ export function generatedLimitations(rows: readonly EvalRow[]): string {
     for (const name of score.missed_traps) out.push(`- ${safe(name)}`);
     if (score.good_rows_dropped.length > 0) out.push('', `Good rows dropped: ${score.good_rows_dropped.join(', ')}.`);
     if (score.unexpected_columns.length > 0 || score.unexpected_rows.length > 0) out.push('', `Unexpected columns ${safe(score.unexpected_columns)}; unexpected rows ${safe(score.unexpected_rows)}.`);
+    if (row.measurement?.category_groups !== undefined) {
+      out.push('', 'Wrongly merged category groups:', '');
+      for (const group of row.measurement.category_groups.wrong) out.push(`- ${safe(group)}`);
+    }
+    if (row.metadata?.transitive_bridges !== undefined) {
+      out.push('', 'Transitive bridge groups (judged member pair below threshold; measured without repair calls):', '');
+      for (const bridge of row.metadata.transitive_bridges) out.push(`- ${safe(bridge)}`);
+    }
     out.push('');
   }
   out.push('Withhold, validator-reject and byte-format traps require their dedicated checks; absence from the cell missed-trap list is not a pass.', '');

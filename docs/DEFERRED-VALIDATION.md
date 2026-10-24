@@ -119,3 +119,48 @@ The scorer, cumulative literal and operational-extension oracle, method registry
 | Report and limitations artifacts | No results files were generated. Generated LIMITATIONS content may change only below its unique marker; static content is kept exactly. | Execute evaluation after authorization; check every wrongly changed coordinate and missed trap name in Markdown/JSONL/LIMITATIONS and preservation of static prefix. |
 
 M5 static check: `node --no-warnings scripts/check-syntax.mjs scripts/eval/scorer.ts scripts/eval/oracle.ts scripts/eval/subset.ts scripts/eval/methods.ts scripts/eval/run.ts scripts/eval/report.ts scripts/eval/limitations.ts tests/scripts/scorer.test.ts tests/scripts/oracle.test.ts` parsed nine TypeScript files with zero syntax failures. Runtime, import/type resolution and all assertions above remain unverified.
+
+## M6 live source construction (0679 core + 0680 edge, 2026-10-24)
+
+Accepted scope remains **Dirty Mode construction — runtime unverified**. No installation, typecheck, test,
+eval, application, browser, network, deployment, credential access or paid call was performed. Core inherited
+replacements were backed up under outer `agentops/backups/M6-core/`. Core uses the TypeSafe skill and the
+dated local `PortfolioBuilder/ideas/small-apps/01-jev-integration-guide.md` fallback because network is
+prohibited in this run; live API documentation is an explicit activation prerequisite.
+
+| What | Why deferred | Exact later check |
+|---|---|---|
+| Import/type/runtime correctness | Approved `check-syntax.mjs` parses erasable TypeScript only. TSX is inspection-only. | After setup authorization: install pinned dependencies/create lockfile, `npm run typecheck`, run `npx vitest run tests/contracts` and existing offline suites. No authored test is a passing result yet. |
+| Browser/Edge request equality | Source tests compare the actual outbound builder and propose/judge envelopes with each folder-local closed schema. Jev batches by both 300 pairs and 65,536 UTF-8 bytes. | Run `tests/contracts/provider-shapes.test.ts`; inspect high-width/long-value profile boundary, exclusions and withheld/truncated values; require no secret or client model/base URL in browser payloads. |
+| Browser activation and cap | `VITE_LIVE_ENABLED=1` is the owner's public attestation, not enforcement. An authenticated Supabase session is additionally required. Browser records have unknown billing and are in-memory, not a durable/global meter. | Owner first configures a genuinely hard provider/project cap (not an alert), enables anonymous auth, configures public Supabase URL/anon key, deploys functions, then sets the public flag. Connect session, toggle live, generate both planners; missing flag/client/session and expired session must block. Follow M7 BOLT-HANDOFF for owner setup. |
+| Function isolation/deployment | Each function has local contract/prompt/provider files; only index.ts reads Deno globals. Managed SUPABASE_URL/SUPABASE_ANON_KEY and server ALLOWED_ORIGINS are required in addition to provider secret names. | Check import maps `npm:zod@3.25.76` and `npm:@supabase/supabase-js@2.57.0` match package base versions, then `deno check supabase/functions/propose-plan/index.ts` and `deno check supabase/functions/judge-categories/index.ts`; deploy only after authorization. |
+| Edge auth/limits/failures | Gateway `verify_jwt=true`, in-handler getUser, configured-origin CORS/OPTIONS, streamed/preparse body cap, 30 s abort and zero retries are source only. | Run authored `propose-plan`/`judge-categories` boundary and mocked-provider tests, then real anonymous JWT/gateway roundtrips. An anon API key alone must fail; missing-secret errors name variables only; every failure must make zero automatic retries. |
+| TypeSafe request/version/usage | Request source is based on the dated local guide, model pinned jev-1.13.0; current wire compatibility has not been verified. | Recheck docs.typesafe.ai at activation: endpoint, question discriminator, instructions/criteria, Noul answers, pinned model availability, usage fields, pricing and request limits; adjust and review adapter before any paid call. |
+| LLM planning | First top-level object parser and validator are source only; malformed output is rejected with notes and never repaired. | Run malformed/extra-key/unknown-op/quoted-brace tests; make one authorized real call and inspect raw rejection, accepted steps and later human-kept predecessor validation. |
+| Jev fixture/live separation | Synthetic fixture thresholds apply only to replay. Live/eval needs status=frozen, freeze_date and per-ColumnId thresholds in fixtures/jev-thresholds.json; current file is intentionally unfrozen. Demo scores cover only their recorded c5 subset. | Rekey fixtures, run keyless Jev replay, then tune on dev seeds 1–4 only. Freeze e.g. `{ "status":"frozen", "freeze_date":"YYYY-MM-DD", "thresholds":{"c5":0.9} }` with all judged ColumnIds and recorded dev evidence before held-out 101–104. Never copy synthetic 0.9 as an unmeasured live default. |
+| Local live spend boundary | Node reads gitignored .env.local only when --live; every call durably appends reservation before invoking the provider, then appends settlement with raw/parsed usage. Unknown prices stop the run; unknown usage/failed potentially billable call blocks all future paid calls. No server/global cap is claimed. | Owner supplies EVAL_PRICE_TABLE path to dated JSON `{ "date":"YYYY-MM-DD", "entries":[{"provider":"anthropic", "model":"owner-model", "input_usd_per_million":0, "output_usd_per_million":0, "max_input_tokens":100000, "max_output_tokens":4096}] }`. Replace illustrative zero rates with verified actual rates; add openai-compatible/typesafe exact model entries as used. Bounds must cover every billed input including framing; code requires at least request UTF-8 bytes plus framing allowance and a 4096-token generative output reservation. Verify prices/bounds and run ledger tests before `npm run eval -- --live`; each invocation is serial and capped at 5 USD. Inspect unresolved reservations after interruption before authorizing another run. |
+| Direct-cell comparator | Node-only synthetic path reuses pure generative call code; its own closed result schema requires every rid/ColumnId exactly once and preserves actual missing widths. Output cap may be insufficient for large responses; failure is reported, never retried. | Run direct identity/schema tests, then authorized matched 200x6 live baseline; inspect incomplete/output-truncated response failure and equal input hashes across all compared methods. Full-file direct rows stay not yet measured. |
+| Robustness experiments | Authored harness includes source-order shuffle, sibling ablation, explicit injection pair and measured transitive bridges. Normal browser disclosure withholds the injection string; only the explicit synthetic test API bypasses screening. No robustness result exists. | Run offline withholding/group/fixture tests. After API/prices/frozen c0 threshold recheck: `npx tsx scripts/eval/jev-harness.ts --live`. Or explicitly set LIVE_JEV_TESTS=1 plus TYPESAFE_API_KEY and EVAL_PRICE_TABLE to run its gated live test. Inspect all eight serial calls, tolerance deltas, request IDs and bridge report. Keys alone do not enable paid tests. |
+| Jev inclusion evidence | Reports carry applied group precision/wrong groups, full-vocabulary alias recall, eligible-candidate alias diagnostic, coverage and bridge lists. Jev remains experimental; no live result or superiority claim exists. | Execute held-out comparison with matching input hashes/provenance after dev freeze; require fewer wrongly merged groups than both rules and live llm at equal or better full-vocabulary alias recall. Eligible recall never substitutes for this gate. Inspect bridge groups in generated LIMITATIONS and actual ledger costs/latency. |
+
+M6 core static inspection: 17 `.ts` files parsed with zero failures; `src/App.tsx` and
+`src/ui/ModeBanner.tsx` are inspection-only. Edge separately reports ten `.ts` files parsed with zero
+failures. These parse checks establish neither resolved types/imports nor executed behavior.
+
+### M6 review rework (0704, 2026-10-24)
+
+Both folder-local edge contracts now check uniqueness only among exact, untruncated disclosed values:
+distinct originals may share a clipped prefix, including one also observed exactly. The browser builder,
+disclosure allowance and Jev candidate membership/distinctness rules are unchanged. Added generated-browser
+regression source in `tests/contracts/provider-shapes.test.ts` covers collisions accepted by both request
+contracts, clipped-only prefixes rejected as pair members/siblings, a legitimately observed exact prefix,
+and duplicate exact entries rejected by both contracts. Its assertions remain unexecuted; run that focused
+file with the existing M6 contract suite after runtime validation is authorized.
+
+Before edits, all five replaced files were copied with matching SHA-256 hashes under outer
+`agentops/backups/M6-rework-1/csv-cleaning-agent/`, preserving their paths. The approved command
+`node --no-warnings scripts/check-syntax.mjs supabase/functions/propose-plan/contract.ts supabase/functions/judge-categories/contract.ts tests/contracts/provider-shapes.test.ts`
+parsed three TypeScript files with zero failures. Source inspection confirmed one active
+`VITE_LIVE_ENABLED=0` assignment; the superseded duplicate remains a comment. No tests, builds, handlers,
+providers, applications, services or network calls were run. Runtime, types and import resolution remain
+unverified.

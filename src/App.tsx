@@ -1,6 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { AppController, applyBlockReason, type PlannerChoice } from './app/controller.ts';
-import { supabase } from './lib/supabase.ts';
 import { ExportBar } from './ui/ExportBar.tsx';
 import { FileDrop } from './ui/FileDrop.tsx';
 import { InvariantPanel } from './ui/InvariantPanel.tsx';
@@ -28,7 +27,7 @@ export function App({ controller = defaultController }: { readonly controller?: 
         <h1>CSV Cleaning Agent</h1>
         <p>Inspect a plan, approve each change, and keep an exact undo journal.</p>
       </header>
-      <ModeBanner configured={supabase !== null} />
+      <ModeBanner gate={state.gate} live={state.live === true} disabled={disabled} onConnect={() => { void controller.connectLive(); }} onToggle={(value) => { controller.setLive(value); }} />
       {state.error !== undefined && <p role="alert" className="error">{state.error}</p>}
       <p role="status" aria-live="polite">{state.busy ? 'Working locally…' : state.ready ? 'Ready' : 'Restoring local session…'}</p>
       <FileDrop busy={disabled} onFile={(file) => { void controller.loadFile(file); }} onSample={() => { void controller.loadSample(); }} />
@@ -45,7 +44,8 @@ export function App({ controller = defaultController }: { readonly controller?: 
           <select id="planner-choice" value={planner} disabled={disabled} onChange={(event) => { setPlanner(event.target.value as PlannerChoice); }}>
             <option value="rules">Rules · offline default</option>
             <option value="fixture">LLM · synthetic fixture replay</option>
-            <option value="jev" disabled>Jev category replay · not yet available</option>
+            <option value="llm" disabled={!state.live}>LLM · live plan</option>
+            <option value="jev">Jev categories on rules · {state.live ? 'live' : 'fixture replay'}</option>
           </select>{' '}
           <button type="button" disabled={disabled || !session.outbound.fits} onClick={() => { void controller.plan(planner); }}>Generate plan</button>
           <p>Plan source: {session.source}. Exclusions apply before the outbound profile is built. Whole-row deduplication still reads all columns locally.</p>

@@ -11,6 +11,12 @@ import { undoAll, undoLast, undoTo } from '../core/journal/undo.ts';
 import { exportPlan, importPlan } from '../core/plan/io.ts';
 import { hashOutboundProfile, loadFixture } from '../core/planners/fixture.ts';
 import { createRulesPlanner } from '../core/planners/rules.ts';
+import { createLlmPlanner, type Invoke, type ProviderReply } from '../core/planners/llm.ts';
+import { jevOnRules } from '../core/planners/jev.ts';
+import { liveGate, type LiveGate } from '../core/live/gate.ts';
+import type { CallRecord } from '../core/providers/types.ts';
+import { supabase } from '../lib/supabase.ts';
+import thresholds from '../../fixtures/jev-thresholds.json';
 import { buildOutboundProfile, type OutboundBuild } from '../core/profile/outbound.ts';
 import { buildLocalProfile, type LocalProfile } from '../core/profile/profile.ts';
 import { approvedPlan, createReviewState, decide, refreshReview, replayRulings, type ReviewAction, type ReviewState } from '../core/review/state.ts';
@@ -19,7 +25,7 @@ import type { ColumnId, Table } from '../core/table.ts';
 import { loadSession, saveSession, type SavedSession } from '../store/idb.ts';
 
 export type ExportKind = 'cleaned' | 'journal' | 'plan' | 'rulings' | 'original';
-export type PlannerChoice = 'rules' | 'fixture';
+export type PlannerChoice = 'rules' | 'fixture' | 'llm' | 'jev';
 export interface Session {
   readonly filename: string;
   readonly original: Blob;
@@ -45,6 +51,9 @@ export interface AppState {
   readonly ready: boolean;
   readonly error?: string;
   readonly session?: Session;
+  readonly live?: boolean;
+  readonly gate?: LiveGate;
+  readonly calls?: readonly CallRecord[];
 }
 const fixtureModules = import.meta.glob<{ default: unknown }>('/fixtures/plans/*.json', { eager: true });
 const fixtureRecords: readonly unknown[] = Object.values(fixtureModules).map((module) => module.default);
@@ -82,10 +91,55 @@ async function derive(record: SavedSession, review?: ReviewState): Promise<Sessi
 
 /** All asynchronous user intents share one queue. Publish only after the candidate snapshot is durable. */
 export class AppController {
-  private state: AppState = { busy: false, ready: false };
+  private state: AppState = { busy: false, ready: false, live: false, gate: liveGate(import.meta.env.VITE_LIVE_ENABLED, supabase !== null, false), calls: [] };
   private readonly listeners = new Set<() => void>();
   private queue: Promise<void> = Promise.resolve();
   private initialized = false;
+  connectLive(): Promise<void> {
+    return this.enqueue(async () => {
+      if (import.meta.env.VITE_LIVE_ENABLED !== '1' || supabase === null) throw new Error(liveGate(import.meta.env.VITE_LIVE_ENABLED, supabase !== null, false).reason);
+      let { data: { session }, error } = await supabase.auth.getSession();
+      if (error !== null) throw error;
+      if (session === null) {
+        const signed = await supabase.auth.signInAnonymously(); error = signed.error; session = signed.data.session;
+      }
+      if (error !== null) throw error;
+      const gate = liveGate(import.meta.env.VITE_LIVE_ENABLED, true, session !== null);
+      this.publish({ ...this.state, gate });
+    });
+  }
+  setLive(enabled: boolean): void {
+    if (enabled && this.state.gate?.enabled !== true) return;
+    this.publish({ ...this.state, live: enabled });
+  }
+  private invokeLive(profileHash: string): Invoke {
+    return async (name, body) => {
+      if (!this.state.live || !this.state.gate?.enabled || supabase === null) throw new Error('Enable an authenticated live connection first.');
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError !== null || session === null) {
+        this.publish({ ...this.state, live: false, gate: liveGate(import.meta.env.VITE_LIVE_ENABLED, true, false) });
+        throw new Error('Live session expired. Connect again.');
+      }
+      const started = performance.now(); const span = crypto.randomUUID();
+      const base: CallRecord = { run: 'browser-session', span, method: name === 'propose-plan' ? 'llm' : 'jev',
+        provider: 'unknown', model: 'unknown', outbound_profile_hash: profileHash, usage: null, latency_ms: null,
+        status: 'reserved', price_table_date: 'unknown', cost_usd: null, reserved_usd: 0, cost_provenance: 'unknown' };
+      this.publish({ ...this.state, calls: [...(this.state.calls ?? []), base] });
+      try {
+        const { data, error } = await supabase.functions.invoke(name, { body, headers: { Authorization: `Bearer ${session.access_token}` } });
+        if (error !== null) throw error;
+        if (data === null || typeof data !== 'object' || data.ok !== true || typeof data.raw !== 'string') throw new Error(data?.error?.message ?? 'Provider returned an invalid response.');
+        const response = data as ProviderReply;
+        const row: CallRecord = { ...base, provider: response.provider, model: response.model, status: 'ok',
+          latency_ms: response.latency_ms, usage: response.usage === null ? null : { ...response.usage, raw: response.raw_usage ?? response.usage } };
+        this.publish({ ...this.state, calls: (this.state.calls ?? []).map((call) => call.span === span ? row : call) });
+        return response;
+      } catch (error) {
+        this.publish({ ...this.state, calls: (this.state.calls ?? []).map((call) => call.span === span ? { ...base, status: 'failed', latency_ms: performance.now() - started, error: message(error) } : call) });
+        throw error;
+      }
+    };
+  }
   readonly getSnapshot = (): AppState => this.state;
   readonly subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
@@ -172,11 +226,19 @@ export class AppController {
       if (choice === 'rules') {
         const result = await createRulesPlanner(session.table).plan(session.outbound.profile, session.local);
         steps = result.steps; source = result.source; notes = result.notes ?? [];
-      } else {
+      } else if (choice === 'fixture') {
         const fixture = loadFixture(fixtureRecords, 'llm', await hashOutboundProfile(session.outbound.profile));
         if (fixture.planner !== 'llm') throw new Error('Expected llm fixture steps.');
         steps = fixture.steps; source = `${fixture.source} (${fixture.fixture_id})`;
         notes = ['Synthetic replay, not a live model call.'];
+      } else if (choice === 'llm') {
+        const result = await createLlmPlanner(session.table, this.invokeLive(await hashOutboundProfile(session.outbound.profile))).plan(session.outbound.profile, session.local);
+        steps = result.steps; source = result.source; notes = result.notes ?? [];
+      } else {
+        const result = await jevOnRules(session.table, session.outbound.profile, session.local, this.state.live
+          ? { invoke: this.invokeLive(await hashOutboundProfile(session.outbound.profile)), thresholds }
+          : { fixtures: fixtureRecords });
+        steps = result.steps; source = result.source; notes = result.notes ?? [];
       }
       const base = await createReviewState(session.table, { version: 1, steps }, {
         outboundColumnIds: session.outbound.column_ids, excludedColumnIds: session.excluded });
