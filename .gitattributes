@@ -1,0 +1,4 @@
+# Byte stability for CSV inputs and fixtures: profile and table hashes are computed over exact bytes,
+# so git must never convert their line endings (PLAN.md §8 item 8).
+*.csv -text
+fixtures/** -text

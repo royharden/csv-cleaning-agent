@@ -1,0 +1,27 @@
+// Node-side TypeScript: developer scripts (run with tsx) and tool configs.
+// Edge functions (Deno) are checked separately with `deno check`.
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    // DOM is included because scripts import the browser-safe src/core modules (WebCrypto, TextDecoder types).
+    "lib": ["ES2023", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["vite.config.ts", "vitest.config.ts", "scripts/**/*.ts"]
+}

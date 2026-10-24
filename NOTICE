@@ -1,0 +1,26 @@
+CSV Cleaning Agent
+Copyright (c) 2026 Roy Harden. Licensed under the MIT License (see LICENSE).
+
+No source code from any of the projects below was copied into this repository. They are credited as
+sources of ideas only. Runtime dependencies are pulled from npm under their own licences
+(MIT / ISC / Apache-2.0), listed in package.json.
+
+Idea sources
+- data-cleaner-agent (MIT): plan-versus-execute ("the model plans, it never touches values"), one
+  plan(profile) interface with an offline rule planner beside an LLM planner, and a fixed dispatch
+  whitelist. This project rejects unknown operations with reasons instead of skipping them, uses strict
+  schemas, and takes a stated date format instead of per-value inference.
+- goldenflow (MIT): dry run before apply; manifest records with affected rows and before/after samples,
+  which inform the step-card counts and samples. Not a dependency.
+- OpenRefine (BSD-3-Clause): operation history, rollback to an earlier step and JSON extract/apply,
+  which inform LIFO undo-to-step-N and plan export/import.
+- Cocoon (MIT): per-step human feedback on model proposals.
+- tab_err (Apache-2.0): separating where errors land from how values are corrupted, which informs the
+  seeded-error injector.
+- databonsai (MIT): its cell-rewriting behaviour is reproduced as the `llm_direct` comparison baseline
+  (behaviour only).
+- LLM4DC / AutoDCWorkflow (no licence stated): read for background only; no data or code used.
+
+Deliberately not used: LLM4DC, CleanAgent and AutoDCWorkflow data or code (no licence); Raha benchmark
+data is never committed (terms undocumented; the optional download script writes to a gitignored folder);
+Jellyfish (CC BY-NC); open expression languages (GREL, regex) and code generation.

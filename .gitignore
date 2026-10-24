@@ -1,0 +1,16 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Local secrets (server secret NAMES are documented in .env.example; values never committed)
+.env.local
+.env.*.local
+
+# Optional external benchmark data (scripts/raha-download.ts, off by default; never committed)
+data/external/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
