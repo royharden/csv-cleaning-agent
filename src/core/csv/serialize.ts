@@ -55,10 +55,26 @@ function headerFields(table: Table, headerWidth: number | undefined): string[] {
   return names.slice(0, headerWidth);
 }
 
-/** The CSV text (without BOM; `encodeTable` adds it). */
+/** A record that is exactly one empty field (a blank line). */
+function isLoneEmptyField(fields: readonly string[]): boolean {
+  return fields.length === 1 && fields[0] === '';
+}
+
+/**
+ * The CSV text (without BOM; `encodeTable` adds it).
+ *
+ * Without a trailing terminator, a final record that is exactly one empty field would serialise to nothing after
+ * the last terminator and vanish on re-parse (the text would merely END with a terminator). It is therefore
+ * written as an explicitly quoted empty field `""`, which re-parses to `['']`.
+ */
 export function serializeTable(table: Table, options: SerializeOptions): string {
-  const records: string[] = [serializeRecord(headerFields(table, options.header_width), options.delimiter)];
+  const header = headerFields(table, options.header_width);
+  const records: string[] = [serializeRecord(header, options.delimiter)];
   for (const row of table.rows) records.push(serializeRecord(row, options.delimiter));
+  if (!options.trailing_terminator) {
+    const last = table.rows.length > 0 ? table.rows[table.rows.length - 1] : header;
+    if (isLoneEmptyField(last)) records[records.length - 1] = '""';
+  }
   const text = records.join(options.terminator);
   return options.trailing_terminator ? text + options.terminator : text;
 }

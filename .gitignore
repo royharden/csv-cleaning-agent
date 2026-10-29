@@ -14,3 +14,18 @@ data/external/
 # OS / editor noise
 .DS_Store
 Thumbs.db
+
+# REPO-S: prevent local credentials and generated archives from being staged
+.env
+.env.*
+.creds/
+ArchiveManager-creds.txt
+*.pem
+*.key
+*.p12
+*.pfx
+*.zip
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/

@@ -155,9 +155,22 @@ export type ThousandsSeparator = (typeof THOUSANDS_SEPARATORS)[number];
 export const CURRENCY_MARKERS = Object.freeze(['$', '€', '£', 'USD', 'EUR', 'GBP'] as const);
 export type CurrencyMarker = (typeof CURRENCY_MARKERS)[number];
 /** Accepted single leading sign characters: ASCII hyphen-minus and U+2212 MINUS SIGN. */
-export const MINUS_SIGNS = Object.freeze(['-', '−'] as const);
+export const MINUS_SIGNS = Object.freeze(['-', '\u2212'] as const);
 /** Thousands groups are exactly this many digits. */
 export const THOUSANDS_GROUP_SIZE = 3;
+/**
+ * Separator conventions the profile measures ("numeric-grammar share per separator convention", spec item 2).
+ * Each is counted with every currency marker allowed and parens_negative on (the most permissive grammar).
+ */
+export const NUMBER_CONVENTIONS: readonly { readonly decimal: DecimalSeparator; readonly thousands: ThousandsSeparator }[] =
+  Object.freeze([
+    { decimal: '.', thousands: ',' },
+    { decimal: '.', thousands: ' ' },
+    { decimal: '.', thousands: 'none' },
+    { decimal: ',', thousands: '.' },
+    { decimal: ',', thousands: ' ' },
+    { decimal: ',', thousands: 'none' },
+  ] as const);
 
 // ---------------------------------------------------------------------------------------------------
 // normalize_case (C §2.6, PLAN.md row 5 and row 26).
@@ -174,9 +187,16 @@ export const TITLE_PARTICLES = Object.freeze(['van', 'der', 'de', 'la', 'von', '
 // trim_whitespace (C §2.6).
 // ---------------------------------------------------------------------------------------------------
 
-export const NBSP = ' ';
-/** Removed when `zero_width: true`: U+200B..U+200D and U+FEFF. */
-export const ZERO_WIDTH_CHARS = Object.freeze(['​', '‌', '‍', '﻿'] as const);
+/** U+00A0 NO-BREAK SPACE (converted to a space before trimming when `nbsp: true`). */
+export const NBSP = '\u00a0';
+/** Removed when `zero_width: true`: U+200B..U+200D and U+FEFF (escapes keep them visible in source). */
+export const ZERO_WIDTH_CHARS = Object.freeze(['\u200b', '\u200c', '\u200d', '\ufeff'] as const);
+/**
+ * Removed from both ends by trim_whitespace and counted as end padding by the profile: ASCII space, tab, LF,
+ * CR, VT, FF. Deliberately not String.prototype.trim(), which also strips NBSP and U+FEFF and would make the
+ * `nbsp` / `zero_width` params meaningless at the ends.
+ */
+export const TRIM_WHITESPACE_CHARS = Object.freeze([' ', '\t', '\n', '\r', '\u000b', '\u000c'] as const);
 
 // ---------------------------------------------------------------------------------------------------
 // Categories (C §2.6, §2.8).
@@ -221,6 +241,20 @@ export const PROFILE_TOP_VALUES = 10;
 export const OUTBOUND_VALUES_PER_COLUMN = 8;
 export const OUTBOUND_VALUE_MAX_CHARS = 40;
 export const OUTBOUND_LABEL_MAX_CHARS = 40;
+/** Most frequent collapsed shapes kept per column: local profile / outbound profile. */
+export const PROFILE_SHAPES_PER_COLUMN = 20;
+export const OUTBOUND_SHAPES_PER_COLUMN = 3;
+/**
+ * Byte budget (UTF-8 of JSON.stringify) for the outbound profile, leaving room under FUNCTION_BODY_MAX_BYTES for
+ * the request envelope. Over budget, the builder lowers the per-column value allowance (8 -> 0), then drops
+ * shapes, and records each reduction; it never raises a limit.
+ */
+export const OUTBOUND_PROFILE_MAX_BYTES = 60_000;
+/**
+ * Formula-like cell (spreadsheet injection risk; profile count + export warning): first character is one of these,
+ * unless the whole cell is a plain signed number such as "-12" or "+3.5".
+ */
+export const FORMULA_PREFIXES = Object.freeze(['=', '+', '-', '@', '\t', '\r'] as const);
 
 // ---------------------------------------------------------------------------------------------------
 // Rules planner thresholds (C §2.8). Tuned on dev only, frozen before held-out.
@@ -236,6 +270,16 @@ export const RULES_DATE_SHARE_MIN = 0.9;
 export const PLAN_VERSION = 1;
 export const PLAN_MAX_STEPS = 32;
 export const RATIONALE_MAX_CHARS = 2_000;
+/** Step ids: 1..64 characters from [A-Za-z0-9_.:-]. */
+export const STEP_ID_MAX_CHARS = 64;
+/** map_categories bounds: groups per step and `from` values per group. */
+export const CATEGORY_GROUPS_MAX = 60;
+export const CATEGORY_FROM_MAX = 60;
+/**
+ * op_version recorded in every apply event (C §2.4): pins the op semantics + grammar/constants version.
+ * Bump together with VOCABULARY_VERSION when any op's behaviour changes.
+ */
+export const OP_VERSION = 1;
 export const REVIEW_SAMPLE_ROWS = 5;
 export const REVIEW_LARGEST_EDITS = 3;
 

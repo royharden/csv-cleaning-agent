@@ -1,0 +1,95 @@
+{
+  "fixture_id": "orders-demo-adversarial-llm-v1",
+  "planner": "llm",
+  "source": "synthetic-fixture",
+  "source_csv": "fixtures/demo/orders-demo.csv",
+  "excluded_column_ids": ["c6"],
+  "profile_hash": "PENDING",
+  "steps": [
+    {
+      "id": "bad-missing-column",
+      "op": "trim_whitespace",
+      "columns": ["c42"],
+      "params": { "ends": true, "collapse_inner": false, "nbsp": true, "zero_width": true },
+      "rationale": "Trim the email column."
+    },
+    {
+      "id": "bad-unknown-op",
+      "op": "fix_everything",
+      "columns": ["c5"],
+      "params": {},
+      "rationale": "Fix all problems in the city column."
+    },
+    {
+      "id": "bad-extra-keys",
+      "op": "null_tokens",
+      "columns": ["c4"],
+      "params": { "tokens": ["NA"], "regex": ".*" },
+      "confidence": 0.97,
+      "rationale": "NA means missing."
+    },
+    {
+      "id": "bad-invented-target",
+      "op": "map_categories",
+      "columns": ["c5"],
+      "params": { "groups": [{ "from": ["NYC"], "to": "New York City" }] },
+      "rationale": "Expand the abbreviation."
+    },
+    {
+      "id": "demo-rename",
+      "op": "rename_headers",
+      "columns": ["c0", "c1"],
+      "params": {},
+      "rationale": "Use snake_case display headers; stable ColumnIds remain unchanged."
+    },
+    {
+      "id": "demo-dedup-early",
+      "op": "drop_duplicate_rows",
+      "columns": [],
+      "params": {},
+      "rationale": "Adversarial ordering: review dedup_before_trim and reject this early step."
+    },
+    {
+      "id": "demo-trim",
+      "op": "trim_whitespace",
+      "columns": ["c0", "c1", "c2", "c3", "c4", "c5"],
+      "params": { "ends": true, "collapse_inner": false, "nbsp": true, "zero_width": true },
+      "rationale": "Remove padding before number parsing and the final duplicate check."
+    },
+    {
+      "id": "demo-parse-amount",
+      "op": "parse_number",
+      "columns": ["c2"],
+      "params": { "decimal": ".", "thousands": ",", "currency": ["$"], "parens_negative": false },
+      "rationale": "Strip the dollar marker without converting long amounts through floating point."
+    },
+    {
+      "id": "demo-null-country",
+      "op": "null_tokens",
+      "columns": ["c4"],
+      "params": { "tokens": ["NA"] },
+      "rationale": "Adversarial null proposal: review null_shape_majority and reject because NA is Namibia."
+    },
+    {
+      "id": "demo-date",
+      "op": "standardize_date",
+      "columns": ["c3"],
+      "params": { "from_format": "MM/DD/YYYY" },
+      "rationale": "Review date_order; edit to DD/MM/YYYY and confirm the intended interpretation."
+    },
+    {
+      "id": "demo-city-alias",
+      "op": "map_categories",
+      "columns": ["c5"],
+      "params": { "groups": [{ "from": ["New York"], "to": "NYC" }] },
+      "rationale": "Both values are observed. Edit to from NYC and to New York, then revalidate and preview."
+    },
+    {
+      "id": "demo-dedup-last",
+      "op": "drop_duplicate_rows",
+      "columns": [],
+      "params": {},
+      "rationale": "Remove exact full-row duplicates after approved normalization."
+    }
+  ]
+}

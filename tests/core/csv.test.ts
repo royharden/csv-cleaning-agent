@@ -78,6 +78,25 @@ describe('format torture: parse', () => {
     expect(meta.terminator_counts).toEqual({ crlf: 1, lf: 3, cr: 0 });
   });
 
+  it('agrees with papaparse on record boundaries for malformed quoting (no record_count_mismatch)', () => {
+    for (const name of [
+      'malformed: quote inside an unquoted field',
+      'malformed: text after a quote inside a quoted field',
+      'malformed: unclosed quote',
+    ]) {
+      const { meta } = mustParse(fixture(name).bytes);
+      const codes = meta.warnings.map((w) => w.code);
+      expect(codes).toContain('malformed_quotes');
+      expect(codes).not.toContain('record_count_mismatch');
+    }
+  });
+
+  it('treats a quote followed by text inside a quoted field as content, not as the closing quote', () => {
+    // The delimiter after the literal quote is inside the field; only the quote before ',' closes it.
+    const { table } = mustParse(utf8('a,b\n"p"q,r",s\n'));
+    expect(table.rows).toEqual([['p"q,r', 's']]);
+  });
+
   it('rejects a UTF-16 byte order mark', () => {
     const result = parseBytes(UTF16LE_BOM_BYTES);
     expect(result.ok).toBe(false);
@@ -251,6 +270,24 @@ describe('round trip: parse -> serialize -> parse', () => {
       }
     });
   }
+
+  it('keeps a final lone empty record when there is no trailing terminator (writes "")', () => {
+    const table = { cols: [{ id: 'c0', name: 'a' }], rows: [['x'], ['']], rid: [0, 1] };
+    const options = { delimiter: ',' as const, terminator: '\n' as const, bom: false, trailing_terminator: false };
+    const text = serializeTable(table, options);
+    expect(text).toBe('a\nx\n""');
+    const again = mustParse(utf8(text));
+    expect(again.table.rows).toEqual([['x'], ['']]);
+    expect(again.meta.trailing_terminator).toBe(false);
+    expect(tablesEqual(table, again.table)).toBe(true);
+  });
+
+  it('does not quote a final lone empty record when the trailing terminator is kept', () => {
+    const table = { cols: [{ id: 'c0', name: 'a' }], rows: [['x'], ['']], rid: [0, 1] };
+    const options = { delimiter: ',' as const, terminator: '\n' as const, bom: false, trailing_terminator: true };
+    expect(serializeTable(table, options)).toBe('a\nx\n\n');
+    expect(mustParse(utf8('a\nx\n\n')).table.rows).toEqual([['x'], ['']]);
+  });
 
   it('treats CRLF and LF twins as the same table (terminator is metadata)', () => {
     const crlf = mustParse(CRLF_BYTES);
